@@ -2,7 +2,15 @@
 name = "pakoda"
 version = "0.1.0"
 authors = ["sn99 <siddharthn.099@gmail.com>"]
+license = "GNU AGPLv3"
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/sn99/pakoda"
 edition = "2018"
+description = "A compiler written in Rust"
+
+[badges]
+travis-ci = { repository = "sn99/pakoda", branch = "master" }
 
 [dependencies]
 regex = "1.1.5"
