@@ -37,6 +37,7 @@ pub enum KeyWords {
     r#true,
     r#false,
     r#fn,
+    r#print,
 }
 
 use self::Token::*;
@@ -67,6 +68,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 "true" => KeyWord(KeyWords::r#true),
                 "false" => KeyWord(KeyWords::r#false),
                 "fn" => KeyWord(KeyWords::r#fn),
+                "print" => KeyWord(KeyWords::r#print),
                 ident => Ident(ident.to_string()),
             }
         } else if capture.name("delimiter").is_some() {

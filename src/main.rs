@@ -24,7 +24,7 @@ fn main() -> Result<(), String> {
     let contents = fs::read_to_string(source_file).expect("Can't read file");
 
     let token_list = lexer::tokenize(&contents);
-    println!("{:#?}", token_list);
+    println!("{:?}", token_list);
 
     Ok(())
 }
