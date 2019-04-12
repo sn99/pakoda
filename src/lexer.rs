@@ -27,6 +27,8 @@ pub enum Token {
     Delimiter,        // ;
     OpenBracket,      // (
     CloseBracket,     // )
+    OpenCurly,        // {
+    CLoseCurly,       // }
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -38,6 +40,7 @@ pub enum KeyWords {
     r#false,
     r#fn,
     r#print,
+    r#start,
 }
 
 use self::Token::*;
@@ -53,7 +56,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
         r"(?P<ident>\p{Alphabetic}\w*)|",
         r"(?P<delimiter>;)|",
         r"(?P<logic>[|&]{2})|",
-        r"(?P<bracket>[()])|",
+        r"(?P<bracket>[()}{])|",
         r"(?P<number>\d+)|",
         r"(?P<inequality><=|==|=|>=|!=|<|>)|",
         r"(?P<operator>\S)"
@@ -69,6 +72,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 "false" => KeyWord(KeyWords::r#false),
                 "fn" => KeyWord(KeyWords::r#fn),
                 "print" => KeyWord(KeyWords::r#print),
+                "start" => KeyWord(KeyWords::r#start),
                 ident => Ident(ident.to_string()),
             }
         } else if capture.name("delimiter").is_some() {
@@ -83,6 +87,8 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             match capture.name("bracket").unwrap().as_str() {
                 ")" => CloseBracket,
                 "(" => OpenBracket,
+                "{" => OpenCurly,
+                "}" => CLoseCurly,
                 _ => unimplemented!(),
             }
         } else if capture.name("number").is_some() {
