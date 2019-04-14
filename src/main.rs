@@ -26,5 +26,9 @@ fn main() -> Result<(), String> {
     let token_list = lexer::tokenize(&contents);
     println!("{:?}", token_list);
 
+    let mut program = parser::Program::new(source_file, contents.as_str());
+    program.parse();
+    println!("\n\n{:#?}", program);
+
     Ok(())
 }

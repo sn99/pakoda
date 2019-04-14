@@ -1,5 +1,5 @@
 # fn + - * / number && || ( ) 45 = == != < > <= >= return true false print { }
 
-fn main(){
+fn main(number a, number b){
     return 0;
 }

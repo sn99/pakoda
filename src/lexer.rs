@@ -31,6 +31,15 @@ pub enum Token {
     CLoseCurly,       // }
 }
 
+impl Token {
+    pub fn get_string(self) -> String {
+        match self {
+            Token::Ident(name) => return name,
+            _ => unimplemented!(),
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 #[allow(non_camel_case_types)]
 pub enum KeyWords {
@@ -54,7 +63,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 
     let tokens_to_match = Regex::new(concat!(
         r"(?P<ident>\p{Alphabetic}\w*)|",
-        r"(?P<delimiter>;)|",
+        r"(?P<separator>,|;)|",
         r"(?P<logic>[|&]{2})|",
         r"(?P<bracket>[()}{])|",
         r"(?P<number>\d+)|",
@@ -75,8 +84,12 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 "start" => KeyWord(KeyWords::r#start),
                 ident => Ident(ident.to_string()),
             }
-        } else if capture.name("delimiter").is_some() {
-            Delimiter
+        } else if capture.name("separator").is_some() {
+            match capture.name("separator").unwrap().as_str() {
+                ";" => Delimiter,
+                "," => Comma,
+                _ => unimplemented!(),
+            }
         } else if capture.name("logic").is_some() {
             match capture.name("logic").unwrap().as_str() {
                 "&&" => And,
