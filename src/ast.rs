@@ -41,7 +41,7 @@ pub struct PrototypeAST {
     pub args: Vec<String>,
 }
 impl PrototypeAST {
-    pub fn getName(&self) -> String {
+    pub fn get_name(&self) -> String {
         self.name.clone()
     }
 }

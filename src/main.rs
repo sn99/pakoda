@@ -20,7 +20,7 @@ fn main() -> Result<(), String> {
     }
 
     let source_file = &args[1];
-    let output_file = &args[2];
+    let _output_file = &args[2];
 
     let contents = fs::read_to_string(source_file).expect("Can't read file");
 
