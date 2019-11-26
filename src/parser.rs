@@ -1,176 +1,301 @@
-/*
-*/
-
+use crate::ast::ExprAST::BinaryExpr;
+use crate::ast::ExprAST::CallExpr;
+use crate::ast::*;
 use crate::lexer;
-use crate::lexer::{KeyWords, Token};
-
-type Statement = Vec<Expression>;
-
-#[derive(PartialEq, Clone, Debug)]
-enum DataType {
-    Number(Option<isize>),
-}
-
-#[derive(PartialEq, Clone, Debug)]
-enum Expression {
-    DataType(String, Option<DataType>),
-    Operator(Operator),
-    FunctionNode(Function),
-    PrototypeNode(Prototype),
-    InequalityNode(Inequality),
-    LogicalNode(LogicalOperator),
-}
-
-#[derive(PartialEq, Clone, Debug)]
-struct ASTNode {
-    function: Function,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-struct Function {
-    prototype: Prototype,
-    r#return: Option<Box<Expression>>,
-    body: Option<Statement>,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-struct Prototype {
-    name: String,
-    args: Option<Vec<Expression>>,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-struct Operator {
-    operator: String,
-    lhs: Box<Expression>,
-    rhs: Box<Expression>,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-struct Inequality {
-    inequality: String,
-    lhs: Box<Expression>,
-    rhs: Box<Expression>,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-struct LogicalOperator {
-    operator: String,
-    lhs: Box<Expression>,
-    rhs: Box<Expression>,
-}
+use crate::lexer::KeyWords;
+use crate::lexer::Token;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Program {
     name: String,
-    node: Vec<ASTNode>,
     tokens: Vec<Token>,
+    curToken: Token,
     token_position: usize,
 }
 
 impl Program {
+    fn getNextToken(&mut self) {
+        self.curToken = self.tokens[self.token_position].clone();
+        self.token_position += 1;
+    }
+
+    fn GetTokPrecedence(&mut self) -> isize {
+        match self.curToken {
+            Token::Plus => {
+                return 20;
+            }
+            Token::Hyphen => {
+                return 20;
+            }
+            Token::Asterisk => {
+                return 40;
+            }
+            Token::LessThan => {
+                return 10;
+            }
+            _ => {
+                return -1;
+            }
+        }
+        -1
+    }
+
     pub fn new(file_name: &String, input: &str) -> Self {
         let tokens = lexer::tokenize(input);
 
         Self {
             name: file_name.to_owned(),
-            node: Vec::new(),
-            tokens,
-            token_position: 0,
+            tokens: lexer::tokenize(input),
+            curToken: tokens[0].clone(),
+            token_position: 1,
         }
     }
 
-    pub fn parse(&mut self) {
-        if self.token_position == 0
-            && self.tokens[self.token_position] != Token::KeyWord(KeyWords::r#fn)
-        {
-            panic!("Start with a function !!!");
-        } else {
+    pub fn start(&mut self) {
+        match self.curToken {
+            Token::Delimiter => self.getNextToken(),
+            Token::KeyWord(KeyWords::r#fn) => {
+                self.ParseDefinition();
+            }
+            Token::KeyWord(KeyWords::r#extern) => {
+                self.ParseExtern();
+            }
+            _ => {
+                self.HandleTopLevelExpression();
+            }
+        }
+    }
+
+    fn ParseNumberExpr(&mut self, num: f64) -> Option<Box<ExprAST>> {
+        let result = Box::new(ExprAST::NumberExpr(NumberExprAST { num }));
+        self.getNextToken();
+        Some(result)
+    }
+
+    fn ParseParenExpr(&mut self) -> Option<Box<ExprAST>> {
+        self.getNextToken();
+        let V = self.ParseExpression();
+
+        if V.is_none() {
+            return None;
+        }
+
+        if self.curToken != Token::CloseBracket {
+            return LogError("expected ')'".to_owned());
+        }
+
+        self.getNextToken();
+
+        V
+    }
+
+    fn ParseIdentifierExpr(&mut self, IdentifierString: String) -> Option<Box<ExprAST>> {
+        let IdName = IdentifierString;
+
+        self.getNextToken();
+
+        if self.curToken != Token::OpenBracket {
+            return Some(Box::new(ExprAST::VariableExpr(VariableExprAST {
+                name: IdName,
+            })));
+        }
+
+        self.getNextToken();
+
+        let mut args: Vec<ExprAST> = Vec::new();
+        if self.curToken != Token::CloseBracket {
             loop {
-                if self.token_position >= self.tokens.len() {
+                let e = self.ParseExpression();
+                match e {
+                    Some(arg) => {
+                        args.push(*arg);
+                    }
+                    None => {
+                        return None;
+                    }
+                }
+
+                if self.curToken == Token::CloseBracket {
                     break;
                 }
-                match self.tokens[self.token_position] {
-                    Token::KeyWord(KeyWords::r#fn) => self.parse_function(),
-                    _ => unimplemented!(),
+
+                if self.curToken != Token::Comma {
+                    return LogError("Expected ')' or ',' in argument list".to_owned());
                 }
+                self.getNextToken();
+            }
+        }
+        self.getNextToken();
+
+        Some(Box::new(CallExpr(CallExprAST {
+            callee: IdName,
+            args,
+        })))
+    }
+
+    pub fn ParsePrimary(&mut self) -> Option<Box<ExprAST>> {
+        match &self.curToken {
+            Token::Ident(e) => {
+                return self.ParseIdentifierExpr(e.clone());
+            }
+            Token::IntNumber(num) => {
+                return self.ParseNumberExpr(*num as f64);
+            }
+            Token::FloatNumber(num) => {
+                return self.ParseNumberExpr(*num);
+            }
+            Token::OpenCurly => {
+                return self.ParseParenExpr();
+            }
+            _ => {
+                LogError("unknown token when expecting an expression".to_owned());
+                None
             }
         }
     }
 
-    fn parse_function(&mut self) {
-        self.token_position += 1;
-        let name = self.tokens[self.token_position].clone().get_string();
+    pub fn ParseExpression(&mut self) -> Option<Box<ExprAST>> {
+        let lhs = self.ParsePrimary();
 
-        self.token_position += 1;
-        if self.tokens[self.token_position] != Token::OpenBracket {
-            panic!("Expected '(' at {}", self.token_position);
+        if lhs.is_none() {
+            return None;
         }
 
-        let mut args: Option<Vec<Expression>> = None;
-        let mut g = Vec::new();
-        self.token_position += 1;
-        if self.tokens[self.token_position] != Token::CloseBracket {
-            args = Some(Vec::new());
-            while self.tokens[self.token_position] != Token::CloseBracket {
-                if self.tokens[self.token_position] == Token::Comma {
-                    self.token_position += 1;
-                }
+        return self.ParseBinOpRHS(0, lhs);
+    }
 
-                if self.tokens[self.token_position] != Token::KeyWord(KeyWords::number) {
-                    panic!("Expected parameter type like 'number'");
-                }
-
-                self.token_position += 1;
-
-                g.push(Expression::DataType(
-                    self.tokens[self.token_position]
-                        .clone()
-                        .get_string()
-                        .to_owned(),
-                    None,
-                ));
-                self.token_position += 1;
+    pub fn ParseBinOpRHS(
+        &mut self,
+        ExprPrec: isize,
+        mut lhs: Option<Box<ExprAST>>,
+    ) -> Option<Box<ExprAST>> {
+        loop {
+            let TokPrec = self.GetTokPrecedence();
+            if TokPrec < ExprPrec {
+                return lhs;
             }
-        }
 
-        if g.len() != 0 {
-            args = Some(g);
-        }
+            let BinOp = self.curToken.clone();
+            self.getNextToken();
 
-        self.token_position += 1;
-        if self.tokens[self.token_position] != Token::OpenCurly {
-            panic!("Expected '{}' at position {}", "{", self.token_position);
-        }
-        self.token_position += 1;
-        let mut body = None;
-        let mut r#return: Option<Box<Expression>> = None;
-        if self.tokens[self.token_position] == Token::KeyWord(KeyWords::r#return) {
-            self.token_position += 1;
-            if let Token::IntNumber(value) = self.tokens[self.token_position] {
-                r#return = Some(Box::new(Expression::DataType(
-                    "Number".to_owned(),
-                    Some(DataType::Number(Some(value))),
-                )));
+            let mut rhs = self.ParsePrimary();
+            if rhs.is_none() {
+                return None;
             }
-        }
 
-        self.token_position += 1;
-        if self.tokens[self.token_position] != Token::Delimiter {
-            panic!("Expected ';'");
-        }
-        self.token_position += 1;
-        if self.tokens[self.token_position] != Token::CLoseCurly {
-            panic!("Expected '{}'", "}");
-        }
-        self.token_position += 1;
+            let NextPrec = self.GetTokPrecedence();
 
-        let function = Function {
-            prototype: Prototype { name, args },
-            r#return,
-            body,
+            if TokPrec < NextPrec {
+                rhs = self.ParseBinOpRHS(TokPrec + 1, rhs);
+
+                if rhs.is_none() {
+                    return None;
+                }
+            }
+
+            lhs = Some(Box::new(BinaryExpr(BinaryExprAST {
+                op: BinOp,
+                lhs: lhs.unwrap(),
+                rhs: rhs.unwrap(),
+            })));
+        }
+    }
+
+    pub fn ParsePrototype(&mut self) -> Option<Box<PrototypeAST>> {
+        let FnName = match &self.curToken {
+            Token::Ident(s) => s.clone(),
+            _ => unimplemented!(),
         };
+        self.getNextToken();
 
-        self.node.push(ASTNode { function });
+        if self.curToken != Token::OpenBracket {
+            return LogErrorP("Expected '(' in protoype".to_owned());
+        }
+        let mut ArgNames: Vec<String> = Vec::new();
+        loop {
+            self.getNextToken();
+            match &self.curToken {
+                Token::Ident(s) => {
+                    ArgNames.push(s.clone().to_owned());
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        if self.curToken != Token::CloseBracket {
+            return LogErrorP("Expected ')' in protoype".to_owned());
+        }
+
+        self.getNextToken();
+
+        Some(Box::new(PrototypeAST {
+            name: FnName.to_owned(),
+            args: ArgNames,
+        }))
     }
+
+    pub fn ParseDefinition(&mut self) -> Option<Box<FunctionAST>> {
+        self.getNextToken();
+        let Proto = self.ParsePrototype();
+        if Proto.is_none() {
+            return None;
+        }
+
+        match self.ParseExpression() {
+            Some(e) => {
+                return Some(Box::new(FunctionAST {
+                    prototype: Proto.unwrap(),
+                    body: e,
+                }));
+            }
+            _ => unimplemented!(),
+        }
+
+        None
+    }
+
+    pub fn ParseExtern(&mut self) -> Option<Box<PrototypeAST>> {
+        self.getNextToken();
+        self.ParsePrototype()
+    }
+
+    pub fn ParseTopLevelExpr(&mut self) -> Option<Box<FunctionAST>> {
+        let k = self.ParseExpression();
+        let q = k.clone();
+
+        match k {
+            None => {}
+            _ => {
+                let Proto = Box::new(PrototypeAST {
+                    name: "__anon_expr".to_string(),
+                    args: vec![],
+                });
+                return Some(Box::new(FunctionAST {
+                    prototype: Proto,
+                    body: q.unwrap(),
+                }));
+            }
+        }
+
+        None
+    }
+
+    pub fn HandleTopLevelExpression(&mut self) {
+        if self.ParseTopLevelExpr().is_some() {
+            println!("Parsed a top-level expr");
+        } else {
+            self.getNextToken();
+        }
+    }
+}
+
+fn LogError(error: String) -> Option<Box<ExprAST>> {
+    eprint!("LogError: {}", error);
+    None
+}
+
+fn LogErrorP(error: String) -> Option<Box<PrototypeAST>> {
+    LogError(error);
+    None
 }

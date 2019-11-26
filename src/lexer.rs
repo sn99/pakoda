@@ -1,11 +1,12 @@
 use regex::Regex;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 #[allow(dead_code)]
 pub enum Token {
     KeyWord(KeyWords), // language Keywords
     Ident(String),     // variable names
     IntNumber(isize),
+    FloatNumber(f64),
     Plus,             // +
     Hyphen,           // -
     Asterisk,         // *
@@ -40,7 +41,7 @@ impl Token {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 #[allow(non_camel_case_types)]
 pub enum KeyWords {
     r#number,
@@ -50,6 +51,7 @@ pub enum KeyWords {
     r#fn,
     r#print,
     r#start,
+    r#extern,
 }
 
 use self::Token::*;
@@ -66,6 +68,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
         r"(?P<separator>,|;)|",
         r"(?P<logic>[|&]{2})|",
         r"(?P<bracket>[()}{])|",
+        r"(?P<decimal>\d+\.\d+)|",
         r"(?P<number>\d+)|",
         r"(?P<inequality><=|==|=|>=|!=|<|>)|",
         r"(?P<operator>\S)"
@@ -82,6 +85,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 "fn" => KeyWord(KeyWords::r#fn),
                 "print" => KeyWord(KeyWords::r#print),
                 "start" => KeyWord(KeyWords::r#start),
+                "extern" => KeyWord(KeyWords::r#extern),
                 ident => Ident(ident.to_string()),
             }
         } else if capture.name("separator").is_some() {
@@ -95,6 +99,11 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 "&&" => And,
                 "||" => Or,
                 _ => unimplemented!(),
+            }
+        } else if capture.name("decimal").is_some() {
+            match capture.name("decimal").unwrap().as_str().parse() {
+                Ok(decimal) => FloatNumber(decimal),
+                Err(e) => panic!("Lexer failed trying to parse number : {:?}", e),
             }
         } else if capture.name("bracket").is_some() {
             match capture.name("bracket").unwrap().as_str() {

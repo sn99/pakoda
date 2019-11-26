@@ -1,3 +1,4 @@
+pub mod ast;
 mod lexer;
 mod parser;
 
@@ -27,8 +28,8 @@ fn main() -> Result<(), String> {
     println!("{:?}", token_list);
 
     let mut program = parser::Program::new(source_file, contents.as_str());
-    program.parse();
-    println!("\n\n{:#?}", program);
+    program.start();
+    println!("\n\n{:?}", program);
 
     Ok(())
 }
