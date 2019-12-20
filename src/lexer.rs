@@ -35,7 +35,7 @@ pub enum Token {
 impl Token {
     pub fn get_string(self) -> String {
         match self {
-            Token::Ident(name) => return name,
+            Token::Ident(name) => name,
             _ => unimplemented!(),
         }
     }

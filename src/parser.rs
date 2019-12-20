@@ -21,25 +21,15 @@ impl Program {
 
     fn get_tok_precedence(&mut self) -> isize {
         match self.cur_token {
-            Token::Plus => {
-                return 20;
-            }
-            Token::Hyphen => {
-                return 20;
-            }
-            Token::Asterisk => {
-                return 40;
-            }
-            Token::LessThan => {
-                return 10;
-            }
-            _ => {
-                return -1;
-            }
+            Token::Plus => 20,
+            Token::Hyphen => 20,
+            Token::Asterisk => 40,
+            Token::LessThan => 10,
+            _ => -1,
         }
     }
 
-    pub fn new(file_name: &String, input: &str) -> Self {
+    pub fn new(file_name: &str, input: &str) -> Self {
         let tokens = lexer::tokenize(input);
 
         Self {
@@ -75,9 +65,7 @@ impl Program {
         self.get_next_token();
         let v = self.parse_expression();
 
-        if v.is_none() {
-            return None;
-        }
+        v.as_ref()?;
 
         if self.cur_token != Token::CloseBracket {
             return log_error("expected ')'".to_owned());
@@ -135,18 +123,10 @@ impl Program {
     pub fn parse_primary(&mut self) -> Option<Box<ExprAST>> {
         let k = self.cur_token.clone();
         match k {
-            Token::Ident(e) => {
-                return self.parse_identifier_expr(e.clone());
-            }
-            Token::IntNumber(num) => {
-                return self.parse_number_expr(num as f64);
-            }
-            Token::FloatNumber(num) => {
-                return self.parse_number_expr(num);
-            }
-            Token::OpenCurly => {
-                return self.parse_paren_expr();
-            }
+            Token::Ident(e) => self.parse_identifier_expr(e),
+            Token::IntNumber(num) => self.parse_number_expr(num as f64),
+            Token::FloatNumber(num) => self.parse_number_expr(num),
+            Token::OpenCurly => self.parse_paren_expr(),
             _ => {
                 log_error("unknown token when expecting an expression".to_owned());
                 None
@@ -157,11 +137,9 @@ impl Program {
     pub fn parse_expression(&mut self) -> Option<Box<ExprAST>> {
         let lhs = self.parse_primary();
 
-        if lhs.is_none() {
-            return None;
-        }
+        lhs.as_ref()?;
 
-        return self.parse_bin_op_rhs(0, lhs);
+        self.parse_bin_op_rhs(0, lhs)
     }
 
     pub fn parse_bin_op_rhs(
@@ -179,18 +157,14 @@ impl Program {
             self.get_next_token();
 
             let mut rhs = self.parse_primary();
-            if rhs.is_none() {
-                return None;
-            }
+            rhs.as_ref()?;
 
             let next_prec = self.get_tok_precedence();
 
             if tok_prec < next_prec {
                 rhs = self.parse_bin_op_rhs(tok_prec + 1, rhs);
 
-                if rhs.is_none() {
-                    return None;
-                }
+                rhs.as_ref()?;
             }
 
             lhs = Some(Box::new(BinaryExpr(BinaryExprAST {
@@ -230,7 +204,7 @@ impl Program {
         self.get_next_token();
 
         Some(Box::new(PrototypeAST {
-            name: fn_name.to_owned(),
+            name: fn_name,
             args: arg_names,
         }))
     }
@@ -238,17 +212,13 @@ impl Program {
     pub fn parse_definition(&mut self) -> Option<Box<FunctionAST>> {
         self.get_next_token();
         let proto = self.parse_prototype();
-        if proto.is_none() {
-            return None;
-        }
+        proto.as_ref()?;
 
         match self.parse_expression() {
-            Some(e) => {
-                return Some(Box::new(FunctionAST {
-                    prototype: proto.unwrap(),
-                    body: e,
-                }));
-            }
+            Some(e) => Some(Box::new(FunctionAST {
+                prototype: proto.unwrap(),
+                body: e,
+            })),
             _ => None,
         }
     }

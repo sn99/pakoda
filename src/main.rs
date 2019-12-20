@@ -5,7 +5,7 @@ mod parser;
 use std::env;
 use std::fs;
 
-const USAGE: &'static str = "
+const USAGE: &str = "
 Usage: cargo run SOURCE_FILE OUTPUT_FILE
 Options:
      
