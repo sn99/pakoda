@@ -13,7 +13,7 @@ description = "A compiler written in Rust"
 travis-ci = { repository = "sn99/pakoda", branch = "master" }
 
 [dependencies]
-regex = "=1.5.3"
+regex = "=1.5.4"
 libc = "0.2.65"
 
 [build-dependencies]
